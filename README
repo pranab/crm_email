@@ -1,13 +1,19 @@
 CrmEmail
 ========
 
-Introduction goes here.
+This is an IMAP email plugin for Fat Free CRM (FFC). This is work in progress.... It's hosted on github primarily for peer review
+Will let you know when it's ready to be used.
 
+It uses the concept of drop box for integrating email with FFC. While sending email to a contact, the user will bcc to the 
+dropbox address. The user will forward any  email received from contacts to the dropbox  address. 
 
 Example
 =======
 
 Example goes here.
 
+Note
+====
+You can can communicate through Fat Free CRM google groups or by sending me email (pkghosh99@gmail.com)
 
-Copyright (c) 2009 [name of plugin creator], released under the MIT license
+Copyright (c) 2009 Pranab Ghosh, released under the MIT license
