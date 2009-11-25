@@ -1,0 +1,10 @@
+= styles_for :email
+
+.title
+
+.list#emails
+  - unless @emails.empty?
+    = render :partial => "email", :collection => @emails
+  - else
+    = render :partial => "common/empty"
+#paginate= render :partial => "common/paginate"

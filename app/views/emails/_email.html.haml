@@ -1,0 +1,10 @@
+%li[email]{ highlightable(dom_id(email, :tools)) }
+  .tools{ invisible, :id => dom_id(email, :tools) }
+    %small
+      = link_to_delete(email) + "&nbsp;"
+  %dt
+    = "Subject: "  + email.subject  << " | "
+    = "From: "  + email.from  << " | "
+    = "To: " + email.to << " | "
+    == Processed #{time_ago_in_words(email.created_at)} ago
+  = hook(:email_bottom, self, :email => email)
