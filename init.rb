@@ -24,4 +24,4 @@ FatFreeCRM::Plugin.register(:crm_email, initializer) do
   dependencies :haml, :simple_column_search
 end
 
-#require 'crm_email'
+require 'email_init'

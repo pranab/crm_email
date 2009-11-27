@@ -5,7 +5,8 @@ email_imap:
   :port         : 993
   :ssl          : false
   :user         : xxxx
-  :passwd       : xxxx
+  :password     : xxxx
   :folder       : inbox
   :move_folder  : ffc
   :schedule     : 1h
+  :admin_port   : 3001  

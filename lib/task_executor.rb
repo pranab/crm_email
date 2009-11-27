@@ -35,6 +35,7 @@ class TaskExecutor
     task.job_id = job_id
   end
 
+  # Unschedules currently scheduled task
   def self.unschedule(task)
     @@scheduler.unschedule(task.job_id)
   end

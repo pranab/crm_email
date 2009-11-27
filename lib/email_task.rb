@@ -29,7 +29,7 @@ class EmailTask < BaseTask
 
   #process all emails in dropbox
   def execute
-    @imap = Net::IMAP.new(@imap_setting[:server], @imap_setting[:port])
+    @imap = Net::IMAP.new(@imap_setting[:server], @imap_setting[:port].to_i)
     @imap.login(@imap_setting[:user], @imap_setting[:password])
     @imap.select(@imap_setting[:folder])
     
