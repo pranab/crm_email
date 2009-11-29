@@ -29,15 +29,18 @@ class EmailTask < BaseTask
 
   #process all emails in dropbox
   def execute
-    @imap = Net::IMAP.new(@imap_setting[:server], @imap_setting[:port].to_i)
+    server = @imap_setting[:server]
+    port = @imap_setting[:port].to_i
+    ssl = @imap_setting[:ssl]
+    @imap = Net::IMAP.new(server, port, ssl)
     @imap.login(@imap_setting[:user], @imap_setting[:password])
     @imap.select(@imap_setting[:folder])
     
     #process all mail read email with test in subject for testing purpose. In reality it will process all emails
-    query = imap_setting[:mode] == "prod" ? ['NOT', 'SEEN'] : ['SUBJECT', 'test']
+    query = @imap_setting[:mode] == "prod" ? ['NOT', 'SEEN'] : ['SUBJECT', 'test']
     @imap.uid_search(query).each do |uid|
       catch(:continue) do
-        mail = TMail::Mail.parse( imap.uid_fetch(uid, 'RFC822').first.attr['RFC822'] )
+        mail = TMail::Mail.parse( @imap.uid_fetch(uid, 'RFC822').first.attr['RFC822'] )
         from = mail.from
         to = mail.to
         bcc = mail.bcc
@@ -110,11 +113,11 @@ class EmailTask < BaseTask
     @imap.disconnect
      
     rescue Net::IMAP::NoResponseError => e
-      logger.error "IMAP server error"
+      logger.error "IMAP server error " + e
     rescue Net::IMAP::ByeResponseError => e
-      logger.error "IMAP server error"
+      logger.error "IMAP server error " + e
     rescue => e
-      logger.error "IMAP server error"
+      logger.error "IMAP server error " + e
  
   end
   
