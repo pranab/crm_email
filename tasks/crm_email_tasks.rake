@@ -22,7 +22,7 @@ namespace :crm_email do
       ActiveRecord::Base.establish_connection(Rails.env)
       settings = YAML.load_file("#{RAILS_ROOT}/vendor/plugins/crm_email/config/settings.yml")
       settings.keys.each do |key|
-        sql = [ "UPDATE  settings SET default_value = ? WHERE name = ?", Base64.encode64(Marshal.dump(settings[key]), key.to_s) ]
+        sql = [ "UPDATE  settings SET default_value = ? WHERE name = ?", Base64.encode64(Marshal.dump(settings[key])), key.to_s]
         sql = if Rails::VERSION::STRING < "2.3.3"
           ActiveRecord::Base.send(:sanitize_sql, sql)
         else
