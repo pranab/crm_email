@@ -48,7 +48,7 @@ class EmailTask < BaseTask
         subject = mail.subject
         msgid = mail.message_id 
         date = mail.date
-        ref_msgid = [mail.in_reply_to, mail.references].flatten.compact.join(" ")          
+        ref_msgid = [mail.in_reply_to, mail.references].flatten.compact.uniq.join(" ")
         
         #normalize all email addresses
         from.map! {|address| normalize_address(address) }
@@ -64,8 +64,25 @@ class EmailTask < BaseTask
         
         if user
           logger.info "processing email for #{user.username}"
-          if bcc.include?(@imap_setting[:email])
-            #if from as user or asignee to as contact and we are in bcc it's outbound
+          if to.include?(@imap_setting[:email])
+            #inbound - forwarded mail from contact
+            body = mail.multipart? ? mail.parts[0].body : mail.body
+            results = parse_fwd_mail(body)
+            
+            from = results[0]
+            find_contact(from, user)
+            to = results[1]
+            cc = results[2]
+            
+            from_list = from.join(" ")
+            to_list = to.join(" ")
+            cc_list = cc.join(" ")
+
+            subject = results[3]
+            date = results[4]
+            
+          else
+            #outbound - bcc mail to contact
             contacts = to.map do |t|
               #find contact by user or assigned to
               contact = Contact.find_by_email_and_user(t, user)
@@ -86,6 +103,7 @@ class EmailTask < BaseTask
               end
               contact
             end
+
             contacts.compact!
             
             #save mail
@@ -93,13 +111,9 @@ class EmailTask < BaseTask
             to_list = to.join(" ")
             cc_list = cc.join(" ")
             bcc_list = bcc.join(" ")
-            body = mail.quoted_body
+            body = mail.multipart? ? mail.parts[0].body : mail.body
             save_email(from_list, to_list, subject, cc_list, bcc_list, body, msgid, ref_msgid, date, user, contacts)
-          else
-            #TODO if fowarded msg has from as user and to as contact it's inbound
-          
           end
-          
         else
           #unknown sender,this email is not supposed to be in drop box
           logger.warn "mail from unknown user from: #{from}  to: #{to} subject: #{subject}"
@@ -109,8 +123,6 @@ class EmailTask < BaseTask
       end
       
     end
-    @imap.logout
-    @imap.disconnect
      
     rescue Net::IMAP::NoResponseError => e
       logger.error "IMAP server error " + e
@@ -118,6 +130,9 @@ class EmailTask < BaseTask
       logger.error "IMAP server error " + e
     rescue => e
       logger.error "IMAP server error " + e
+    ensure
+      @imap.logout
+      @imap.disconnect
  
   end
   
@@ -173,6 +188,74 @@ class EmailTask < BaseTask
   def logger
     RAILS_DEFAULT_LOGGER
   end
+
+  #find or create contact from email address
+  def find_contact(addrs, user)
+    contacts = addrs.map do |addr|
+      #find contact by user or assigned to
+      contact = Contact.find_by_email_and_user(addr, user)
+      if contact.nil?
+        contact = Contact.find_by_email_and_assignee(addr, user)
+      end
+
+      if contact.nil?
+        #create contact, user is emailing a contact that's not in FFC
+        logger.info "new contact #{t}"
+        contact = Contact.new
+        contact.user = user
+        contact.email = addr
+        unless contact.save
+          logger.warn "could not save contact #{addr}"
+          contact = nil
+        end
+      end
+      contact
+    end
+
+    contacts.compact!
+  end
+
+  # parses  mail embedded in forwarded mail to extract from and to 
+  def parse_fwd_mail(body)
+    results = []
+    
+    from = extract_address(body, 'From;', "Failed to parse from address in forwarded mail body")
+    to = extract_address(body, 'To;', "Failed to parse to address in forwarded mail body")
+    cc = extract_address(body, 'CC;', "Failed to parse CC address in forwarded mail body")
+    results << from  
+    results << to  
+    results << cc  
+    
+    subject = extract_text(body, 'Subject;', "Failed to parse subject in forwarded mail body")
+    date = extract_text(body, 'Date;', "Failed to parse date in forwarded mail body")
+    results << subject
+    results << date
+    
+    results
+  end
   
+  #extracts address from embedded forwarded email
+  def extract_address(body, label, err_msg)
+    email_pattern = /[\w._%+-]+@[\w.-]+\.[A-Za-z]{2,4}/
+    parts = body.split(label)
+    raise err_msg if parts.length != 2
+    part = parts[1]
+    part_end = part.index('\n')
+    part = part[0....part_end]
+    addrs = part.scan(email_pattern)
+    raise err_msg if addrs.empty?
+    addrs
+  end
+
+  
+  #extracts other headers from embedded forwarded email
+  def extract_text(body, label, err_msg)
+    email_pattern = /[\w._%+-]+@[\w.-]+\.[A-Za-z]{2,4}/
+    parts = body.split(label)
+    raise err_msg if parts.length != 2
+    part = parts[1]
+    part_end = part.index('\n')
+    part = part[0....part_end]
+  end
   
 end
