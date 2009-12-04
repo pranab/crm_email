@@ -38,7 +38,8 @@ class EmailTask < BaseTask
     
     #process all mail read email with test in subject for testing purpose. In reality it will process all emails
     query = @imap_setting[:mode] == "prod" ? ['NOT', 'SEEN'] : ['SUBJECT', 'test']
-    @imap.uid_search(query).each do |uid|
+    uids = @imap.uid_search(query)
+    uids.each do |uid|
       catch(:continue) do
         mail = TMail::Mail.parse( @imap.uid_fetch(uid, 'RFC822').first.attr['RFC822'] )
         from = mail.from
@@ -53,8 +54,8 @@ class EmailTask < BaseTask
         #normalize all email addresses
         from.map! {|address| normalize_address(address) }
         to.map! {|address| normalize_address(address) }
-        cc.map! {|address| normalize_address(address) } unless cc.is_nil?
-        bcc.map! {|address| normalize_address(address) } unless bcc.is_nil?
+        cc.map! {|address| normalize_address(address) } if cc
+        bcc.map! {|address| normalize_address(address) } if bcc
 
         #find matching user
         user = nil
@@ -84,11 +85,8 @@ class EmailTask < BaseTask
           else
             #outbound - bcc mail to contact
             contacts = to.map do |t|
-              #find contact by user or assigned to
-              contact = Contact.find_by_email_and_user(t, user)
-              if contact.nil?
-                contact = Contact.find_by_email_and_assignee(t, user)
-              end
+              #find contact by email
+              contact = Contact.find_by_email(t)
               
               if contact.nil?
                 #create contact, user is emailing a contact that's not in FFC
@@ -109,10 +107,11 @@ class EmailTask < BaseTask
             #save mail
             from_list = from.join(" ")
             to_list = to.join(" ")
-            cc_list = cc.join(" ")
-            bcc_list = bcc.join(" ")
+            cc_list = cc ? cc.join(" ") : ''
+            bcc_list = bcc ? bcc.join(" ") : ''
             body = mail.multipart? ? mail.parts[0].body : mail.body
-            save_email(from_list, to_list, subject, cc_list, bcc_list, body, msgid, ref_msgid, date, user, contacts)
+            save_email(from_list, to_list, subject, cc_list, bcc_list, body, 
+              msgid, ref_msgid, date, user, contacts, uid)
           end
         else
           #unknown sender,this email is not supposed to be in drop box
@@ -125,11 +124,11 @@ class EmailTask < BaseTask
     end
      
     rescue Net::IMAP::NoResponseError => e
-      logger.error "IMAP server error " + e
+      logger.error "IMAP server error no response" + e
     rescue Net::IMAP::ByeResponseError => e
-      logger.error "IMAP server error " + e
+      logger.error "IMAP server error bye response " + e
     rescue => e
-      logger.error "IMAP server error " + e
+      logger.error "IMAP server error other error" + e
     ensure
       @imap.logout
       @imap.disconnect
@@ -139,12 +138,13 @@ class EmailTask < BaseTask
   
   private
   #since the domain is case insensitive, always downcase the domain part
-  def nomalize_address(address)
+  def normalize_address(address)
     address.gsub(/@\w+\.\w+/) { |s| s.downcase}
   end
 
   #save email
-  def save_email (from_list, to_list, subject, cc_list, bcc_list, body, msgid, ref_msgid, date, user, contacts)
+  def save_email (from_list, to_list, subject, cc_list, bcc_list, body, msgid, 
+    ref_msgid, date, user, contacts, uid)
     email = Email.new
     email.from = from_list
     email.to = to_list
@@ -165,7 +165,7 @@ class EmailTask < BaseTask
       #move or delete processed mail
       handle_processed_mail(uid) if @imap_setting[:mode] == "prod"
     else
-      logger.warn "failed to save email from: #{from}  to: #{to} subject: #{subject}"
+      logger.warn "failed to save email from: #{from_list}  to: #{to_list} subject: #{subject}"
     end
   
   end
@@ -241,7 +241,7 @@ class EmailTask < BaseTask
     raise err_msg if parts.length != 2
     part = parts[1]
     part_end = part.index('\n')
-    part = part[0....part_end]
+    part = part[0...part_end]
     addrs = part.scan(email_pattern)
     raise err_msg if addrs.empty?
     addrs
@@ -255,7 +255,7 @@ class EmailTask < BaseTask
     raise err_msg if parts.length != 2
     part = parts[1]
     part_end = part.index('\n')
-    part = part[0....part_end]
+    part = part[0...part_end]
   end
   
 end
