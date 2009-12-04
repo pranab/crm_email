@@ -1,14 +1,28 @@
 CrmEmail
 ========
 
-This is an IMAP email plugin for Fat Free CRM (FFC). This is work in progress.... It's hosted on github primarily for peer review. Will let you know when it's ready to be used.
+This is an IMAP email plugin for Fat Free CRM (FFC). This is work in progress..... Inbound email processing seems to work. Working on out bound email now. Will let you know when it's ready to be used.
 
 It uses the concept of drop box for integrating email with FFC. While sending email to a contact, the user will bcc to the dropbox address. The user will forward any  email received from contacts to the dropbox  address. 
 
-Example
+
+Setup
 =======
 
-Example goes here.
+- Create settings.yml from the sample settings.yml.sample in the config dir and edit according to your needs
+
+- Run this rake task to load the settings data for this plugin 
+  rake crm_email:settings:load
+  
+- To update settings data any time, edit settings.yml and run the following rake task
+  rake crm_email:settings:reload
+  
+- Run the the generator from fat_free_crm project root as follows. This will create the db migration file for this plugin in the FFC db/migrate directory
+  ruby script/generate crm_email
+ 
+- Create crm_email related db schema by running
+  rake db:migrate
+  
 
 Note
 ====
