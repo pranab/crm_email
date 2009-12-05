@@ -1,12 +1,13 @@
 
 email_imap:
-  :mode         : prod
-  :server       : imap.gmail.com
-  :port         : 993
-  :ssl          : false
-  :user         : xxxx
-  :password     : xxxx
-  :folder       : inbox
-  :move_folder  : ffc
-  :schedule     : 1h
-  :admin_port   : 3001  
+  :mode           : prod
+  :server         : imap.gmail.com
+  :port           : 993
+  :ssl            : true
+  :user           : xxxx
+  :password       : xxxx
+  :folder         : inbox
+  :move_folder    : ffc
+  :schedule       : 1h
+  :create_contact : true
+  :admin_port     : 3001  

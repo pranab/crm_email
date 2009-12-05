@@ -91,12 +91,14 @@ class EmailTask < BaseTask
               if contact.nil?
                 #create contact, user is emailing a contact that's not in FFC
                 logger.info "new contact #{t}"
-                contact = Contact.new
-                contact.user = user
-                contact.email = t
-                unless contact.save 
-                  logger.warn "could not save contact #{t}"
-                  contact = nil
+
+                if (@imap_setting[:create_contact])
+                  contact = Contact.new
+                  contact.user = user
+                  contact.email = t
+                  unless contact.save
+                    logger.warn "could not save contact #{t}"
+                  end
                 end
               end
               contact
