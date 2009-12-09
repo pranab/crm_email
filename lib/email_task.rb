@@ -37,7 +37,7 @@ class EmailTask < BaseTask
     @imap.select(@imap_setting[:folder])
     
     #process all mail read email with test in subject for testing purpose. In reality it will process all emails
-    query = @imap_setting[:mode] == "prod" ? ['NOT', 'SEEN'] : ['SUBJECT', 'test']
+    query = @imap_setting[:mode] == "prod" ? ['NOT', 'SEEN'] : ['SUBJECT', 'testin']
     uids = @imap.uid_search(query)
     uids.each do |uid|
       catch(:continue) do
@@ -65,22 +65,30 @@ class EmailTask < BaseTask
         
         if user
           logger.info "processing email for #{user.username}"
-          if to.include?(@imap_setting[:email])
+          if to.include?(@imap_setting[:user])
             #inbound - forwarded mail from contact
             body = mail.multipart? ? mail.parts[0].body : mail.body
             results = parse_fwd_mail(body)
             
             from = results[0]
-            find_contact(from, user)
+            contacts = find_contact(from, user)
             to = results[1]
             cc = results[2]
+            cc = nil if cc.empty?
             
             from_list = from.join(" ")
             to_list = to.join(" ")
-            cc_list = cc.join(" ")
+            cc_list = cc.join(" ") if cc
+            bcc_list = nil
 
             subject = results[3]
             date = results[4]
+            msgid = nil
+            ref_msgid = nil
+
+
+            save_email(from_list, to_list, subject, cc_list, bcc_list, body,
+              msgid, ref_msgid, date, user, contacts, uid)
             
           else
             #outbound - bcc mail to contact
@@ -194,21 +202,20 @@ class EmailTask < BaseTask
   #find or create contact from email address
   def find_contact(addrs, user)
     contacts = addrs.map do |addr|
-      #find contact by user or assigned to
-      contact = Contact.find_by_email_and_user(addr, user)
-      if contact.nil?
-        contact = Contact.find_by_email_and_assignee(addr, user)
-      end
+      #find contact email
+      contact = Contact.find_by_email(addr)
 
       if contact.nil?
         #create contact, user is emailing a contact that's not in FFC
         logger.info "new contact #{t}"
-        contact = Contact.new
-        contact.user = user
-        contact.email = addr
-        unless contact.save
-          logger.warn "could not save contact #{addr}"
-          contact = nil
+        if (@imap_setting[:create_contact])
+          contact = Contact.new
+          contact.user = user
+          contact.email = addr
+          unless contact.save
+            logger.warn "could not save contact #{addr}"
+            contact = nil
+          end
         end
       end
       contact
@@ -221,15 +228,15 @@ class EmailTask < BaseTask
   def parse_fwd_mail(body)
     results = []
     
-    from = extract_address(body, 'From;', "Failed to parse from address in forwarded mail body")
-    to = extract_address(body, 'To;', "Failed to parse to address in forwarded mail body")
-    cc = extract_address(body, 'CC;', "Failed to parse CC address in forwarded mail body")
+    from = extract_address(body, 'From:', "Failed to parse from address in forwarded mail body", true)
+    to = extract_address(body, 'To:', "Failed to parse to address in forwarded mail body", true)
+    cc = extract_address(body, 'CC:', "Failed to parse CC address in forwarded mail body", false)
     results << from  
     results << to  
     results << cc  
     
-    subject = extract_text(body, 'Subject;', "Failed to parse subject in forwarded mail body")
-    date = extract_text(body, 'Date;', "Failed to parse date in forwarded mail body")
+    subject = extract_text(body, 'Subject:', "Failed to parse subject in forwarded mail body")
+    date = extract_text(body, 'Date:', "Failed to parse date in forwarded mail body")
     results << subject
     results << date
     
@@ -237,27 +244,47 @@ class EmailTask < BaseTask
   end
   
   #extracts address from embedded forwarded email
-  def extract_address(body, label, err_msg)
+  def extract_address(body, label, err_msg, mandatory)
+    addrs = []
     email_pattern = /[\w._%+-]+@[\w.-]+\.[A-Za-z]{2,4}/
     parts = body.split(label)
-    raise err_msg if parts.length != 2
-    part = parts[1]
-    part_end = part.index('\n')
-    part = part[0...part_end]
-    addrs = part.scan(email_pattern)
-    raise err_msg if addrs.empty?
+
+    if parts.length == 2
+      part = parts[1]
+      #part_end = part.index('\n')
+      #part = part[0...part_end]
+      part.lstrip!
+      tokens = part.split(/\s+/)
+      part = tokens[0]
+      addrs = part.scan(email_pattern)
+      raise err_msg if addrs.empty?
+    else
+      raise err_msg if mandatory
+    end
+    
     addrs
   end
 
   
   #extracts other headers from embedded forwarded email
   def extract_text(body, label, err_msg)
-    email_pattern = /[\w._%+-]+@[\w.-]+\.[A-Za-z]{2,4}/
     parts = body.split(label)
     raise err_msg if parts.length != 2
     part = parts[1]
-    part_end = part.index('\n')
-    part = part[0...part_end]
+    part.lstrip!
+    tokens = part.split(/\s+/)
+    i = 0
+    word_tokens = []
+    headers = %{From: To: Subject: Date:}
+    while i < tokens.length
+      if tokens[i] =~ /\w+/ && !headers.include?(tokens[i])
+        word_tokens << tokens[i]
+      else
+        break
+      end
+      i += 1
+    end
+    word_tokens.join(' ')
   end
   
 end
