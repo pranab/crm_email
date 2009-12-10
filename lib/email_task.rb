@@ -37,7 +37,7 @@ class EmailTask < BaseTask
     @imap.select(@imap_setting[:folder])
     
     #process all mail read email with test in subject for testing purpose. In reality it will process all emails
-    query = @imap_setting[:mode] == "prod" ? ['NOT', 'SEEN'] : ['SUBJECT', 'testin']
+    query = @imap_setting[:mode] == "prod" ? ['NOT', 'DELETED'] : ['SUBJECT', 'testin']
     uids = @imap.uid_search(query)
     uids.each do |uid|
       catch(:continue) do
@@ -83,7 +83,6 @@ class EmailTask < BaseTask
 
             subject = results[3]
             date = results[4]
-            msgid = nil
             ref_msgid = nil
 
 
@@ -222,6 +221,7 @@ class EmailTask < BaseTask
     end
 
     contacts.compact!
+    contacts
   end
 
   # parses  mail embedded in forwarded mail to extract from and to 
