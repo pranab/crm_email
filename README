@@ -1,16 +1,29 @@
 CrmEmail
 ========
 
-This is an IMAP email plugin for Fat Free CRM (FFC). This is work in progress..... Inbound email processing seems to work. Working on out bound email now. Will let you know when it's ready to be used.
+This is an IMAP email plugin for Fat Free CRM (FFC). Inbound and out  bound email processing seem to work. I will continue testing. 
 
 It uses the concept of drop box for integrating email with FFC. While sending email to a contact, the user will bcc to the dropbox address. The user will forward any  email received from contacts to the dropbox  address. 
 
 
 Setup
 =======
-
+- Install this gem for scheduling
+  gem install rufus-scheduler
+  
 - Create settings.yml from the sample settings.yml.sample in the config dir and edit according to your needs
-
+  :mode - Set to prod
+  :server - imap server URL
+  :port - imap port number
+  :ssl - Set to true or false
+  :user - Imap login ID
+  :password  - imap login password
+  :folder  - Folder to be accessed. Typically it's inbox
+  :move_folder  - Folder where email should be moved after processing. if you want email to be deleted after processing do not provide any folder name
+  :schedule - Schedule for running background email task. For example '2h' for running every 2 hours or '0 22 * * 1-5' for every day of the week at 10 PM
+  :create_contact - if set to true contact will be created if the contact lookup based on email fails for inbound and out bound emails
+  :admin_port - Ignore this
+  
 - Run this rake task to load the settings data for this plugin 
   rake crm_email:settings:load
   
@@ -22,7 +35,12 @@ Setup
  
 - Create crm_email related db schema by running
   rake db:migrate
-  
+
+Usage
+=====
+- For outbound email, when sending email to your contact from your email client bcc to the dropbox address
+- For inbound email from your contact, forward received email to the dropbox address 
+
 
 Note
 ====
